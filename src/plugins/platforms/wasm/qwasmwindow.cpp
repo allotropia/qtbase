@@ -424,4 +424,11 @@ bool QWasmWindow::windowIsPopupType(Qt::WindowFlags flags) const
     return (flags.testFlag(Qt::Popup));
 }
 
+void QWasmWindow::requestActivateWindow()
+{
+    if (window()->isTopLevel())
+        raise();
+    QPlatformWindow::requestActivateWindow();
+}
+
 QT_END_NAMESPACE
