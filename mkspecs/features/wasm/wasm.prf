@@ -8,6 +8,7 @@ exists($$QMAKE_QT_CONFIG) {
 
     qtConfig(thread) {
 
+        EMCC_THREAD_CFLAGS += -s USE_PTHREADS=1
         EMCC_THREAD_LFLAGS += -s USE_PTHREADS=1
 
         # Create worker threads at startup. This is supposed to be an optimization,
@@ -38,8 +39,8 @@ exists($$QMAKE_QT_CONFIG) {
     }
     QMAKE_LFLAGS       += $$EMCC_THREAD_LFLAGS
     QMAKE_LFLAGS_DEBUG += $$EMCC_THREAD_LFLAGS
-    QMAKE_CFLAGS += $$EMCC_THREAD_LFLAGS
-    QMAKE_CXXFLAGS += $$EMCC_THREAD_LFLAGS
+    QMAKE_CFLAGS += $$EMCC_THREAD_CFLAGS
+    QMAKE_CXXFLAGS += $$EMCC_THREAD_CFLAGS
 }
 
 # Create js and wasm files for applications
