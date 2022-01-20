@@ -111,29 +111,28 @@ void QWasmCompositor::addWindow(QWasmWindow *window, QWasmWindow *parentWindow)
     else
         m_compositedWindows[parentWindow].childWindows.append(window);
 
-    if (!QGuiApplication::focusWindow()) {
-        window->requestActivateWindow();
-    }
     notifyTopWindowChanged(window);
 }
 
 void QWasmCompositor::removeWindow(QWasmWindow *window)
 {
-    QWasmWindow *platformWindow = m_compositedWindows[window].parentWindow;
-
-    if (platformWindow) {
-        QWasmWindow *parentWindow = window;
+    QWasmWindow *parentWindow = m_compositedWindows[window].parentWindow;
+    if (parentWindow)
         m_compositedWindows[parentWindow].childWindows.removeAll(window);
-    }
 
     m_windowStack.removeAll(window);
     m_compositedWindows.remove(window);
 
-    if (!m_windowStack.isEmpty() && !QGuiApplication::focusWindow()) {
-        auto lastWindow = m_windowStack.last();
-        lastWindow->requestActivateWindow();
+    if (!m_windowStack.isEmpty() && (!QGuiApplication::focusWindow() || QGuiApplication::focusWindow() == window->window())) {
+        QWasmWindow *focusWindow = nullptr;
+        for (auto i = m_windowStack.rbegin(); i != m_windowStack.rend(); i++)
+            if ((*i)->window()->isVisible()) {
+                focusWindow = *i;
+                break;
+            }
+        if (focusWindow)
+            notifyTopWindowChanged(focusWindow);
     }
-    notifyTopWindowChanged(window);
 }
 
 void QWasmCompositor::setVisible(QWasmWindow *window, bool visible)
@@ -175,7 +174,10 @@ void QWasmCompositor::lower(QWasmWindow *window)
     QWasmCompositedWindow &compositedWindow = m_compositedWindows[window];
     m_globalDamage = compositedWindow.window->geometry(); // repaint previosly covered area.
 
-    notifyTopWindowChanged(window);
+    if (!m_windowStack.isEmpty() && !QGuiApplication::focusWindow()) {
+        auto lastWindow = m_windowStack.last();
+        notifyTopWindowChanged(lastWindow);
+    }
 }
 
 void QWasmCompositor::setParent(QWasmWindow *window, QWasmWindow *parent)
@@ -736,13 +738,25 @@ void QWasmCompositor::frame()
         m_context->swapBuffers(someWindow->window());
 }
 
+static bool lcl_canActivate(QWindow* pWindow)
+{
+    return pWindow
+            && !(pWindow->flags() & (Qt::WindowDoesNotAcceptFocus | Qt::BypassWindowManagerHint))
+            && pWindow->type() != Qt::ToolTip
+            && pWindow->type() != Qt::Popup;
+}
+
 void QWasmCompositor::notifyTopWindowChanged(QWasmWindow *window)
 {
-    QWindow *modalWindow;
+    QWindow *modalWindow = nullptr;
     bool blocked = QGuiApplicationPrivate::instance()->isWindowBlocked(window->window(), &modalWindow);
 
-    if (blocked) {
+    if (lcl_canActivate(modalWindow))
         modalWindow->requestActivate();
+    else if (!blocked && lcl_canActivate(window->window()))
+        window->window()->requestActivate();
+
+    if (blocked) {
         raise(static_cast<QWasmWindow*>(modalWindow->handle()));
         return;
     }

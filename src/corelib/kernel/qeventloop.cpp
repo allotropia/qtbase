@@ -163,6 +163,11 @@ int QEventLoop::exec(ProcessEventsFlags flags)
     Q_D(QEventLoop);
     auto threadData = d->threadData.loadRelaxed();
 
+#ifdef Q_OS_WASM
+    if (threadData->loopLevel >= 1)
+        return -1;
+#endif
+
     //we need to protect from race condition with QThread::exit
     QMutexLocker locker(&static_cast<QThreadPrivate *>(QObjectPrivate::get(threadData->thread.loadAcquire()))->mutex);
     if (threadData->quitNow)

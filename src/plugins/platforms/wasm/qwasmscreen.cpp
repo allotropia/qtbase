@@ -217,6 +217,7 @@ void QWasmScreen::updateQScreenAndCanvasRenderSize()
     QPoint position(rect["left"].as<int>() - offset.x(), rect["top"].as<int>() - offset.y());
 
     setGeometry(QRect(position, cssSize.toSize()));
+    qDebug() << QRect(position, cssSize.toSize()) << devicePixelRatio();
     m_compositor->redrawWindowContent();
 }
 

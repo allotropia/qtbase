@@ -115,6 +115,8 @@ protected:
     QWasmCompositor *m_compositor = nullptr;
     QWasmBackingStore *m_backingStore = nullptr;
     QRect m_normalGeometry {0, 0, 0 ,0};
+    QCursor m_oldCursor;
+    bool m_oldCursorValid = false;
 
     Qt::WindowState m_windowState = Qt::WindowNoState;
     QWasmCompositor::SubControls m_activeControl = QWasmCompositor::SC_None;

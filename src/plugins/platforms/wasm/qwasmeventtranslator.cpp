@@ -43,7 +43,6 @@
 #include <QtCore/qdeadlinetimer.h>
 #include <private/qmakearray_p.h>
 #include <QtCore/qnamespace.h>
-#include <QCursor>
 
 #include <emscripten/bind.h>
 
@@ -592,9 +591,6 @@ void QWasmEventTranslator::processMouse(int eventType, const EmscriptenMouseEven
     switch (eventType) {
     case EMSCRIPTEN_EVENT_MOUSEDOWN:
     {
-        if (window2)
-            window2->requestActivate();
-
         pressedButtons.setFlag(button);
 
         if (mouseEvent->button == 0) {
@@ -639,8 +635,19 @@ void QWasmEventTranslator::processMouse(int eventType, const EmscriptenMouseEven
     {
         buttonEventType = QEvent::MouseMove;
 
-        if (htmlWindow && htmlWindow->isPointOnResizeRegion(globalPoint))
-            window2->setCursor(cursorForMode(htmlWindow->resizeModeAtPoint(globalPoint)));
+        if (htmlWindow) {
+	    if (htmlWindow->isPointOnResizeRegion(globalPoint)) {
+		if (!htmlWindow->m_oldCursorValid)
+		{
+                    htmlWindow->m_oldCursor = window2->cursor();
+		    htmlWindow->m_oldCursorValid = true;
+		}
+                window2->setCursor(cursorForMode(htmlWindow->resizeModeAtPoint(globalPoint)));
+	    } else if (htmlWindow->m_oldCursorValid) {
+		htmlWindow->m_oldCursorValid = false;
+                window2->setCursor(htmlWindow->m_oldCursor);
+	    }
+        }
 
         if (!(htmlWindow->m_windowState & Qt::WindowFullScreen) && !(htmlWindow->m_windowState & Qt::WindowMaximized)) {
             if (resizeMode == QWasmWindow::ResizeNone && draggedWindow) {
