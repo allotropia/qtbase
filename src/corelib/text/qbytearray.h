@@ -51,6 +51,7 @@
 
 #include <string>
 #include <iterator>
+#include <limits>
 
 #ifdef truncate
 #error qbytearray.h must be included before any header file that defines truncate

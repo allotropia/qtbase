@@ -53,6 +53,7 @@
 
 #include "private/qglobal_p.h"
 
+#include <limits>
 #include <tuple>
 #include <array>
 
