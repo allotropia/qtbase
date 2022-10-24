@@ -441,6 +441,11 @@ function QtLoader(config)
         // Finally evaluate the emscripten application script, which will
         // reference the global Module object created above.
         self.eval(emscriptenModuleSource); // ES5 indirect global scope eval
+        // Upload files to emscripten (virtual) file system
+        for (let i = 0; i < config.fileNames.length; i++) {
+            Module['FS'].writeFile( config.fileNames[i], config.fileByteArray[i] );
+            Module['arguments'].push(config.fileNames[i]);
+        }
     }
 
     function setErrorContent() {
