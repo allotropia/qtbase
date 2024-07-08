@@ -129,7 +129,7 @@ QWasmIntegration::QWasmIntegration()
     emscripten::val::global("window").set("onbeforeunload", val::module_property("qtBrowserBeforeUnload"));
 
     // install browser window resize handler
-    auto onWindowResize = [](int eventType, const EmscriptenUiEvent *e, void *userData) -> int {
+    auto onWindowResize = [](int eventType, const EmscriptenUiEvent *e, void *userData) -> EM_BOOL {
         Q_UNUSED(eventType);
         Q_UNUSED(e);
         Q_UNUSED(userData);

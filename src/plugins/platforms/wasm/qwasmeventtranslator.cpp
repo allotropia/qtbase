@@ -437,7 +437,7 @@ QFlags<Qt::KeyboardModifier> QWasmEventTranslator::translateMouseEventModifier(c
     return translatKeyModifier(mouseEvent);
 }
 
-int QWasmEventTranslator::keyboard_cb(int eventType, const EmscriptenKeyboardEvent *keyEvent, void *userData)
+EM_BOOL QWasmEventTranslator::keyboard_cb(int eventType, const EmscriptenKeyboardEvent *keyEvent, void *userData)
 {
     QWasmEventTranslator *wasmTranslator = reinterpret_cast<QWasmEventTranslator *>(userData);
     bool accepted = wasmTranslator->processKeyboard(eventType, keyEvent);
@@ -500,7 +500,7 @@ Qt::MouseButton QWasmEventTranslator::translateMouseButton(unsigned short button
     return Qt::NoButton;
 }
 
-int QWasmEventTranslator::mouse_cb(int eventType, const EmscriptenMouseEvent *mouseEvent, void *userData)
+EM_BOOL QWasmEventTranslator::mouse_cb(int eventType, const EmscriptenMouseEvent *mouseEvent, void *userData)
 {
     QWasmEventTranslator *translator = (QWasmEventTranslator*)userData;
     translator->processMouse(eventType,mouseEvent);
@@ -676,12 +676,12 @@ void QWasmEventTranslator::processMouse(int eventType, const EmscriptenMouseEven
     }
 }
 
-int QWasmEventTranslator::focus_cb(int /*eventType*/, const EmscriptenFocusEvent */*focusEvent*/, void */*userData*/)
+EM_BOOL QWasmEventTranslator::focus_cb(int /*eventType*/, const EmscriptenFocusEvent */*focusEvent*/, void */*userData*/)
 {
     return 0;
 }
 
-int QWasmEventTranslator::wheel_cb(int eventType, const EmscriptenWheelEvent *wheelEvent, void *userData)
+EM_BOOL QWasmEventTranslator::wheel_cb(int eventType, const EmscriptenWheelEvent *wheelEvent, void *userData)
 {
     Q_UNUSED(eventType)
 
@@ -727,7 +727,7 @@ int QWasmEventTranslator::wheel_cb(int eventType, const EmscriptenWheelEvent *wh
     return 1;
 }
 
-int QWasmEventTranslator::touchCallback(int eventType, const EmscriptenTouchEvent *touchEvent, void *userData)
+EM_BOOL QWasmEventTranslator::touchCallback(int eventType, const EmscriptenTouchEvent *touchEvent, void *userData)
 {
     auto translator = reinterpret_cast<QWasmEventTranslator*>(userData);
     return translator->handleTouch(eventType, touchEvent);

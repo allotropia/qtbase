@@ -52,12 +52,12 @@ public:
     explicit QWasmEventTranslator(QWasmScreen *screen);
     ~QWasmEventTranslator();
 
-    static int keyboard_cb(int eventType, const EmscriptenKeyboardEvent *keyEvent, void *userData);
-    static int mouse_cb(int eventType, const EmscriptenMouseEvent *mouseEvent, void *userData);
-    static int focus_cb(int eventType, const EmscriptenFocusEvent *focusEvent, void *userData);
-    static int wheel_cb(int eventType, const EmscriptenWheelEvent *wheelEvent, void *userData);
+    static EM_BOOL keyboard_cb(int eventType, const EmscriptenKeyboardEvent *keyEvent, void *userData);
+    static EM_BOOL mouse_cb(int eventType, const EmscriptenMouseEvent *mouseEvent, void *userData);
+    static EM_BOOL focus_cb(int eventType, const EmscriptenFocusEvent *focusEvent, void *userData);
+    static EM_BOOL wheel_cb(int eventType, const EmscriptenWheelEvent *wheelEvent, void *userData);
 
-    static int touchCallback(int eventType, const EmscriptenTouchEvent *ev, void *userData);
+    static EM_BOOL touchCallback(int eventType, const EmscriptenTouchEvent *ev, void *userData);
 
     void processEvents();
     void initEventHandlers();
