@@ -277,6 +277,7 @@ function QtLoader(config)
                 self.loaderSubState = "Downloading/Compiling";
                 setStatus("Loading");
                 return WebAssembly.compileStreaming(response).catch(function(error) {
+                    console.error(error);
                     // compileStreaming may/will fail if the server does not set the correct
                     // mime type (application/wasm) for the wasm file. Fall back to fetch,
                     // then compile in this case.
@@ -398,6 +399,7 @@ function QtLoader(config)
                 publicAPI.exitText = undefined
                 publicAPI.exitCode = code;
             } else {
+                console.error(exception);
                 publicAPI.exitText = exception.toString();
                 publicAPI.crashed = true;
             }
