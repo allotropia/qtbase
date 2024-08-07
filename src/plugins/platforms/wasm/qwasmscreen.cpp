@@ -59,7 +59,13 @@ QWasmScreen::QWasmScreen(const emscripten::val &canvas)
     m_eventTranslator = new QWasmEventTranslator(this);
     installCanvasResizeObserver();
     updateQScreenAndCanvasRenderSize();
-    m_canvas.call<void>("focus");
+    if (!m_canvas["focus"].isUndefined()) {
+        m_canvas.call<void>("focus");
+    } else {
+        // Emscripten PROXY_TO_PTHREAD case, where canvas is an OffscreenCanvas, not a
+        // HTMLCanvasElement:
+        //TODO
+    }
 }
 
 QWasmScreen::~QWasmScreen()
@@ -143,11 +149,16 @@ qreal QWasmScreen::devicePixelRatio() const
     //
     // The effective devicePixelRatio is the product of these two scale factors, upper-bounded
     // by window.devicePixelRatio in order to avoid e.g. allocating a 10x widget backing store.
-    double dpr = emscripten::val::global("window")["devicePixelRatio"].as<double>();
-    emscripten::val visualViewport = emscripten::val::global("window")["visualViewport"];
-    double scale = visualViewport.isUndefined() ? 1.0 : visualViewport["scale"].as<double>();
-    double effectiveDevicePixelRatio = std::min(dpr * scale, dpr);
-    return qreal(effectiveDevicePixelRatio);
+    if (!emscripten::val::global("window").isUndefined()) {
+        double dpr = emscripten::val::global("window")["devicePixelRatio"].as<double>();
+        emscripten::val visualViewport = emscripten::val::global("window")["visualViewport"];
+        double scale = visualViewport.isUndefined() ? 1.0 : visualViewport["scale"].as<double>();
+        double effectiveDevicePixelRatio = std::min(dpr * scale, dpr);
+        return qreal(effectiveDevicePixelRatio);
+    } else {
+        // Emscripten PROXY_TO_PTHREAD case:
+        return emscripten_get_device_pixel_ratio(); //TODO
+    }
 }
 
 QString QWasmScreen::name() const
@@ -209,12 +220,21 @@ void QWasmScreen::updateQScreenAndCanvasRenderSize()
     m_canvas.set("width", canvasSize.width());
     m_canvas.set("height", canvasSize.height());
 
-    QPoint offset;
-    offset.setX(m_canvas["offsetLeft"].as<int>());
-    offset.setY(m_canvas["offsetTop"].as<int>());
+    QPoint position;
+    if (!(m_canvas["offsetLeft"].isUndefined() || m_canvas["offsetTop"].isUndefined() ||
+          m_canvas["getBoundingClientRect"].isUndefined()))
+    {
+        QPoint offset;
+        offset.setX(m_canvas["offsetLeft"].as<int>());
+        offset.setY(m_canvas["offsetTop"].as<int>());
 
-    emscripten::val rect = m_canvas.call<emscripten::val>("getBoundingClientRect");
-    QPoint position(rect["left"].as<int>() - offset.x(), rect["top"].as<int>() - offset.y());
+        emscripten::val rect = m_canvas.call<emscripten::val>("getBoundingClientRect");
+        position = QPoint(rect["left"].as<int>() - offset.x(), rect["top"].as<int>() - offset.y());
+    } else {
+        // Emscripten PROXY_TO_PTHREAD case, where canvas is an OffscreenCanvas, not a
+        // HTMLCanvasElement:
+        position = QPoint(0, 0); //TODO
+    }
 
     setGeometry(QRect(position, cssSize.toSize()));
     qDebug() << QRect(position, cssSize.toSize()) << devicePixelRatio();

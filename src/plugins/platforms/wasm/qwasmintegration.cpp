@@ -121,12 +121,21 @@ QWasmIntegration::QWasmIntegration()
             addScreen(qtCanvaseElements[i].as<emscripten::val>());
         }
     } else if (!canvas.isUndefined()) {
-        qWarning() << "Module.canvas is deprecated. A future version of Qt will stop reading this property. "
-                   << "Instead, set Module.qtCanvasElements to be an array of canvas elements, or use qtloader.js.";
+        // Under Emscripten PROXY_TO_PTHREAD, we will only see canvas here, not qtCanvasElements
+        // (see qtloader.js), so don't warn in that case:
+        if (!emscripten::val::global("window").isUndefined()) {
+            qWarning() << "Module.canvas is deprecated. A future version of Qt will stop reading this property. "
+                       << "Instead, set Module.qtCanvasElements to be an array of canvas elements, or use qtloader.js.";
+        }
         addScreen(canvas);
     }
 
-    emscripten::val::global("window").set("onbeforeunload", val::module_property("qtBrowserBeforeUnload"));
+    if (!emscripten::val::global("window").isUndefined()) {
+        emscripten::val::global("window").set("onbeforeunload", val::module_property("qtBrowserBeforeUnload"));
+    } else {
+        // Emscripten PROXY_TO_PTHREAD case:
+        //TODO
+    }
 
     // install browser window resize handler
     auto onWindowResize = [](int eventType, const EmscriptenUiEvent *e, void *userData) -> EM_BOOL {
@@ -144,10 +153,15 @@ QWasmIntegration::QWasmIntegration()
     emscripten_set_resize_callback(EMSCRIPTEN_EVENT_TARGET_WINDOW, nullptr, 1, onWindowResize);
 
     // install visualViewport resize handler which picks up size and scale change on mobile.
-    emscripten::val visualViewport = emscripten::val::global("window")["visualViewport"];
-    if (!visualViewport.isUndefined()) {
-        visualViewport.call<void>("addEventListener", val("resize"),
-                          val::module_property("qtResizeAllScreens"));
+    if (!emscripten::val::global("window").isUndefined()) {
+        emscripten::val visualViewport = emscripten::val::global("window")["visualViewport"];
+        if (!visualViewport.isUndefined()) {
+            visualViewport.call<void>("addEventListener", val("resize"),
+                              val::module_property("qtResizeAllScreens"));
+        }
+    } else {
+        // Emscripten PROXY_TO_PTHREAD case:
+        //TODO
     }
 }
 

@@ -32,6 +32,7 @@
 #include <QtCore/qcoreapplication.h>
 
 #include <emscripten.h>
+#include <emscripten/bind.h>
 
 #if QT_CONFIG(thread)
 #if (__EMSCRIPTEN_major__ > 1 || __EMSCRIPTEN_minor__ > 38 || __EMSCRIPTEN_minor__ == 38 && __EMSCRIPTEN_tiny__ >= 22)
@@ -195,7 +196,10 @@ void QWasmEventDispatcher::wakeUp()
 #ifdef EMSCRIPTEN_HAS_ASYNC_RUN_IN_MAIN_RUNTIME_THREAD
     if (!emscripten_is_main_runtime_thread())
         if (m_hasMainLoop)
-            emscripten_async_run_in_main_runtime_thread_(EM_FUNC_SIG_VI, (void*)(&QWasmEventDispatcher::mainThreadWakeUp), this);
+            // Under Emscripten PROXY_TO_PTHREAD, the Qt event loop does not run on the main runtime
+            // thread, so don't ask that unrelated thread to run any Qt event loop code:
+            if (!emscripten::val::global("window").isUndefined())
+                emscripten_async_run_in_main_runtime_thread_(EM_FUNC_SIG_VI, (void*)(&QWasmEventDispatcher::mainThreadWakeUp), this);
 #endif
     QEventDispatcherUNIX::wakeUp();
 }

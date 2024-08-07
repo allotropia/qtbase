@@ -398,6 +398,9 @@ function QtLoader(config)
                 // Clean exit with code
                 publicAPI.exitText = undefined
                 publicAPI.exitCode = code;
+                if (Module.ignoreApplicationExit) {
+                    return;
+                }
             } else {
                 console.error(exception);
                 publicAPI.exitText = exception.toString();
@@ -417,6 +420,12 @@ function QtLoader(config)
         Module.mainScriptUrlOrBlob = new Blob([emscriptenModuleSource], {type: 'text/javascript'});
 
         Module.qtCanvasElements = config.canvasElements;
+        if (Module.qtCanvasElements) {
+            // Emscripten PROXY_TO_PTHREAD only forwards Module.canvas to the worker thread, not
+            // Module.qtCanvasElements, so we need to set that here so that the QWasmIntegration
+            // constructor can read it:
+            Module.canvas = Module.qtCanvasElements[0];
+        }
 
         config.restart = function() {
 

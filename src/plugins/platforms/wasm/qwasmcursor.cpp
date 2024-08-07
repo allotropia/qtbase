@@ -63,7 +63,13 @@ void QWasmCursor::changeCursor(QCursor *windowCursor, QWindow *window)
     // Set cursor on the canvas
     val canvas = QWasmScreen::get(screen)->canvas();
     val canvasStyle = canvas["style"];
-    canvasStyle.set("cursor", val(htmlCursorName.constData()));
+    if (!canvasStyle.isUndefined()) {
+        canvasStyle.set("cursor", val(htmlCursorName.constData()));
+    } else {
+        // Emscripten PROXY_TO_PTHREAD case, where canvas is an OffscreenCanvas, not a
+        // HTMLCanvasElement:
+        //TODO
+    }
 }
 
 QByteArray QWasmCursor::cursorShapeToHtml(Qt::CursorShape shape)
