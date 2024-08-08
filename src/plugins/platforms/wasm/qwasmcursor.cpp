@@ -36,8 +36,19 @@
 
 #include <emscripten/emscripten.h>
 #include <emscripten/bind.h>
+#include <emscripten/threading.h>
 
 using namespace emscripten;
+
+extern "C" {
+static void setCursor(char const *htmlCursorName) {
+    // Under Emscripten PROXY_TO_PTHREAD, there will only be a single canvas (see the
+    // QWasmIntegration ctor):
+    val canvas = val::module_property("canvas");
+    val canvasStyle = canvas["style"];
+    canvasStyle.set("cursor", val(htmlCursorName));
+}
+}
 
 void QWasmCursor::changeCursor(QCursor *windowCursor, QWindow *window)
 {
@@ -47,7 +58,7 @@ void QWasmCursor::changeCursor(QCursor *windowCursor, QWindow *window)
     if (!screen)
         return;
 
-    QByteArray htmlCursorName;
+    char const *htmlCursorName;
     if (windowCursor) {
 
         // Bitmap and custom cursors are not implemented (will fall back to "auto")
@@ -57,24 +68,24 @@ void QWasmCursor::changeCursor(QCursor *windowCursor, QWindow *window)
 
         htmlCursorName = cursorShapeToHtml(windowCursor->shape());
     }
-    if (htmlCursorName.isEmpty())
+    if (htmlCursorName == nullptr)
         htmlCursorName = "default";
 
     // Set cursor on the canvas
     val canvas = QWasmScreen::get(screen)->canvas();
     val canvasStyle = canvas["style"];
     if (!canvasStyle.isUndefined()) {
-        canvasStyle.set("cursor", val(htmlCursorName.constData()));
+        canvasStyle.set("cursor", val(htmlCursorName));
     } else {
         // Emscripten PROXY_TO_PTHREAD case, where canvas is an OffscreenCanvas, not a
         // HTMLCanvasElement:
-        //TODO
+        emscripten_async_run_in_main_runtime_thread(EM_FUNC_SIG_VI, setCursor, htmlCursorName);
     }
 }
 
-QByteArray QWasmCursor::cursorShapeToHtml(Qt::CursorShape shape)
+char const *QWasmCursor::cursorShapeToHtml(Qt::CursorShape shape)
 {
-    QByteArray cursorName;
+    char const *cursorName = nullptr;
 
     switch (shape) {
     case Qt::ArrowCursor:

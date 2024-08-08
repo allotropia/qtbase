@@ -37,7 +37,7 @@ class QWasmCursor : public QPlatformCursor
 public:
     void changeCursor(QCursor *windowCursor, QWindow *window) override;
 
-    QByteArray cursorShapeToHtml(Qt::CursorShape shape);
+    char const *cursorShapeToHtml(Qt::CursorShape shape);
 };
 
 #endif
