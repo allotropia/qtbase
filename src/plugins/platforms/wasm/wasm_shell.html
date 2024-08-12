@@ -21,13 +21,11 @@
       canvas { outline: 0px solid transparent; caret-color: transparent; cursor:default }
     </style>
   </head>
-  <body>
+  <body onload="init()">
     <figure style="overflow:visible;" id="qtspinner">
       <center style="margin-top:1.5em; line-height:150%">
         <img src="qtlogo.svg" width="320" height="200" style="display:block"></img>
-        <strong>Qt for WebAssembly: @APPNAME@</strong><br>
-        <label>Select files from your system: </label>
-        <input type="file" id="fileinput" accept=".odt,.ott,.ods,.ots,.odp,.otp,.odg,.otg" multiple /><br>
+        <strong>Qt for WebAssembly: @APPNAME@</strong>
         <div id="qtstatus"></div>
         <noscript>JavaScript is disabled. Please enable JavaScript to use this application.</noscript>
       </center>
@@ -35,15 +33,13 @@
     <canvas id="qtcanvas" oncontextmenu="event.preventDefault()" contenteditable="true"></canvas>
 
     <script type='text/javascript'>
-        function init(names, values) {
+        function init() {
           var spinner = document.querySelector('#qtspinner');
           var canvas = document.querySelector('#qtcanvas');
           var status = document.querySelector('#qtstatus')
 
           var qtLoader = QtLoader({
               canvasElements : [canvas],
-              fileNames : names,
-              fileByteArray : values,
               showLoader: function(loaderStatus) {
                   spinner.style.display = 'block';
                   canvas.style.display = 'none';
@@ -70,42 +66,6 @@
           });
           qtLoader.loadEmscriptenModule("@APPNAME@");
       }
-        function readAsArrayBuffer(file){
-           return new Promise(function(resolve,reject){
-               let fr = new FileReader();
-
-               fr.onload = function(){
-                   resolve(new Uint8Array( fr.result ));
-               };
-
-               fr.onerror = function(){
-                   reject(fr);
-               };
-
-               fr.readAsArrayBuffer(file);
-           });
-       }
-
-       // Handle multiple fileuploads
-       document.getElementById("fileinput").addEventListener("change", function(ev){
-           let files = ev.currentTarget.files;
-           let readers = [];
-           let names = [];
-
-           // Abort if there were no files selected
-           if(!files.length) return;
-
-           // Store promises in array
-           for(let i = 0;i < files.length;i++){
-              names.push(files[i].name);
-              readers.push(readAsArrayBuffer(files[i]));
-           }
-
-           // Trigger Promises
-           Promise.all(readers).then((values) => {
-              init(names, values);
-           });
-       }, false);
     </script>
     <script type="text/javascript" src="qtloader.js"></script>
   </body>
