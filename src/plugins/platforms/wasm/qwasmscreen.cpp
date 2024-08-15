@@ -35,6 +35,7 @@
 #include "qwasmstring.h"
 
 #include <emscripten/bind.h>
+#include <emscripten/threading.h>
 #include <emscripten/val.h>
 
 #include <QtEglSupport/private/qeglconvenience_p.h>
@@ -52,6 +53,15 @@ QT_BEGIN_NAMESPACE
 
 const char * QWasmScreen::m_canvasResizeObserverCallbackContextPropertyName = "data-qtCanvasResizeObserverCallbackContext";
 
+extern "C" {
+static void setFocus() {
+    // Under Emscripten PROXY_TO_PTHREAD, there will only be a single canvas (see the
+    // QWasmIntegration ctor):
+    val canvas = val::module_property("canvas");
+    canvas.call<void>("focus");
+}
+}
+
 QWasmScreen::QWasmScreen(const emscripten::val &canvas)
     : m_canvas(canvas)
 {
@@ -64,7 +74,7 @@ QWasmScreen::QWasmScreen(const emscripten::val &canvas)
     } else {
         // Emscripten PROXY_TO_PTHREAD case, where canvas is an OffscreenCanvas, not a
         // HTMLCanvasElement:
-        //TODO
+        emscripten_async_run_in_main_runtime_thread(EM_FUNC_SIG_V, setFocus);
     }
 }
 
