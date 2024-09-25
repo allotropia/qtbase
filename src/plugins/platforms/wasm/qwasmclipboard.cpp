@@ -27,6 +27,8 @@
 **
 ****************************************************************************/
 
+#include <mutex>
+
 #include "qwasmclipboard.h"
 #include "qwasmwindow.h"
 #include "qwasmstring.h"
@@ -34,6 +36,7 @@
 #include <emscripten.h>
 #include <emscripten/html5.h>
 #include <emscripten/bind.h>
+#include <emscripten/threading.h>
 
 #include <QCoreApplication>
 #include <qpa/qwindowsysteminterface.h>
@@ -41,22 +44,29 @@
 using namespace emscripten;
 
 // there has got to be a better way...
+static std::mutex g_clipboardMutex;
 static QString g_clipboardText;
 static QString g_clipboardFormat;
 
 static val getClipboardData()
 {
+    //TODO: For correctness, both g_clipboardText and g_clipboardFormat in getClipboardData and
+    // getClipboardFormat should atomically be read under a single g_clipboardMutex lock:
+    std::scoped_lock g(g_clipboardMutex);
     return QWasmString::fromQString(g_clipboardText);
 }
 
 static val getClipboardFormat()
 {
+    //TODO: For correctness, both g_clipboardText and g_clipboardFormat in getClipboardData and
+    // getClipboardFormat should atomically be read under a single g_clipboardMutex lock:
+    std::scoped_lock g(g_clipboardMutex);
     return QWasmString::fromQString(g_clipboardFormat);
 }
 
-static void pasteClipboardData(emscripten::val format, emscripten::val dataPtr)
+static void pasteClipboardData(QString format, emscripten::val dataPtr)
 {
-    QString formatString = QWasmString::toQString(format);
+    QString formatString = format;
     QByteArray dataArray =  QByteArray::fromStdString(dataPtr.as<std::string>());
     QMimeData *mMimeData = new QMimeData;
     mMimeData->setData(formatString, dataArray);
@@ -65,7 +75,7 @@ static void pasteClipboardData(emscripten::val format, emscripten::val dataPtr)
 
 static void qClipboardPromiseResolve(emscripten::val something)
 {
-    pasteClipboardData(emscripten::val("text/plain"), something);
+    pasteClipboardData("text/plain", something);
 }
 
 static void qClipboardCutTo(val event)
@@ -116,24 +126,41 @@ static void qClipboardPasteTo(val event)
 EMSCRIPTEN_BINDINGS(qtClipboardModule) {
     function("qtGetClipboardData", &getClipboardData);
     function("qtGetClipboardFormat", &getClipboardFormat);
-    function("qtPasteClipboardData", &pasteClipboardData);
     function("qtClipboardPromiseResolve", &qClipboardPromiseResolve);
     function("qtClipboardCutTo", &qClipboardCutTo);
     function("qtClipboardCopyTo", &qClipboardCopyTo);
     function("qtClipboardPasteTo", &qClipboardPasteTo);
 }
 
-QWasmClipboard::QWasmClipboard()
-{
+extern "C" {
+static bool setUp() {
     val clipboard = val::global("navigator")["clipboard"];
     val permissions = val::global("navigator")["permissions"];
-    hasClipboardApi = (!clipboard.isUndefined() && !permissions.isUndefined() && !clipboard["readText"].isUndefined());
-    if (hasClipboardApi)
-        initClipboardEvents();
+    if (clipboard.isUndefined() || permissions.isUndefined() || clipboard["readText"].isUndefined())
+    {
+        return false;
+    }
+
+    val readPermissionsMap = val::object();
+    readPermissionsMap.set("name", val("clipboard-read"));
+    permissions.call<val>("query", readPermissionsMap);
+
+    val writePermissionsMap = val::object();
+    writePermissionsMap.set("name", val("clipboard-write"));
+    permissions.call<val>("query", writePermissionsMap);
+
+    return true;
+}
+}
+
+QWasmClipboard::QWasmClipboard()
+{
+    hasClipboardApi = emscripten_sync_run_in_main_runtime_thread(EM_FUNC_SIG_I, setUp);
 }
 
 QWasmClipboard::~QWasmClipboard()
 {
+    std::scoped_lock g(g_clipboardMutex);
     g_clipboardText.clear();
     g_clipboardFormat.clear();
 }
@@ -149,11 +176,21 @@ QMimeData* QWasmClipboard::mimeData(QClipboard::Mode mode)
 void QWasmClipboard::setMimeData(QMimeData* mimeData, QClipboard::Mode mode)
 {
     if (mimeData->hasText()) {
-        g_clipboardFormat = mimeData->formats().at(0);
-        g_clipboardText = mimeData->text();
+        QString format = mimeData->formats().at(0);
+        QString text = mimeData->text();
+        {
+            std::scoped_lock g(g_clipboardMutex);
+            g_clipboardFormat = format;
+            g_clipboardText = text;
+        }
     } else if (mimeData->hasHtml()) {
-        g_clipboardFormat = mimeData->formats().at(0);
-        g_clipboardText = mimeData->html();
+        QString format = mimeData->formats().at(0);
+        QString text = mimeData->html();
+        {
+            std::scoped_lock g(g_clipboardMutex);
+            g_clipboardFormat = format;
+            g_clipboardText = text;
+        }
     }
 
     QPlatformClipboard::setMimeData(mimeData, mode);
@@ -178,21 +215,6 @@ void QWasmClipboard::qWasmClipboardPaste(QMimeData *mData)
                 0, QEvent::KeyPress, Qt::Key_V,  Qt::ControlModifier, "V");
 }
 
-void QWasmClipboard::initClipboardEvents()
-{
-    if (!hasClipboardApi)
-        return;
-
-    val permissions = val::global("navigator")["permissions"];
-    val readPermissionsMap = val::object();
-    readPermissionsMap.set("name", val("clipboard-read"));
-    permissions.call<val>("query", readPermissionsMap);
-
-    val writePermissionsMap = val::object();
-    writePermissionsMap.set("name", val("clipboard-write"));
-    permissions.call<val>("query", writePermissionsMap);
-}
-
 void QWasmClipboard::installEventHandlers(const emscripten::val &canvas)
 {
     if (hasClipboardApi)
@@ -207,23 +229,38 @@ void QWasmClipboard::installEventHandlers(const emscripten::val &canvas)
                       val::module_property("qtClipboardPasteTo"));
 }
 
+extern "C" {
+static void doReadTextFromClipboard() {
+    val navigator = val::global("navigator");
+    val textPromise = navigator["clipboard"].call<val>("readText");
+    val readTextResolve = val::global("Module")["qtClipboardPromiseResolve"];
+    textPromise.call<val>("then", readTextResolve);
+}
+}
+
 void QWasmClipboard::readTextFromClipboard()
 {
     if (QWasmIntegration::get()->getWasmClipboard()->hasClipboardApi) {
-        val navigator = val::global("navigator");
-        val textPromise = navigator["clipboard"].call<val>("readText");
-        val readTextResolve = val::global("Module")["qtClipboardPromiseResolve"];
-        textPromise.call<val>("then", readTextResolve);
+        emscripten_async_run_in_main_runtime_thread(EM_FUNC_SIG_V, doReadTextFromClipboard);;
     }
+}
+
+extern "C" {
+static void doWriteTextToClipboard() {
+    QString text;
+    {
+        std::scoped_lock g(g_clipboardMutex);
+        text = g_clipboardText;
+    }
+    val txt = QWasmString::fromQString(text);
+    val navigator = val::global("navigator");
+    navigator["clipboard"].call<void>("writeText", txt);
+}
 }
 
 void QWasmClipboard::writeTextToClipboard()
 {
     if (QWasmIntegration::get()->getWasmClipboard()->hasClipboardApi) {
-        val module = val::global("Module");
-        val txt = module.call<val>("qtGetClipboardData");
-        val format =  module.call<val>("qtGetClipboardFormat");
-        val navigator = val::global("navigator");
-        navigator["clipboard"].call<void>("writeText", txt);
+        emscripten_sync_run_in_main_runtime_thread(EM_FUNC_SIG_V, doWriteTextToClipboard);;
     }
 }

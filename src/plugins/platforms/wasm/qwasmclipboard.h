@@ -51,7 +51,6 @@ public:
     bool ownsMode(QClipboard::Mode mode) const override;
 
     static void qWasmClipboardPaste(QMimeData *mData);
-    void initClipboardEvents();
     void installEventHandlers(const emscripten::val &canvas);
     bool hasClipboardApi;
     void readTextFromClipboard();
