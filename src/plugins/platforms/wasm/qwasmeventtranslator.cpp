@@ -374,7 +374,11 @@ void QWasmEventTranslator::initEventHandlers()
     if (platform == MacOSPlatform) {
         g_useNaturalScrolling = false; // make this !default on macOS
 
-        if (!emscripten::val::global("window")["safari"].isUndefined()) {
+        //TODO: Under Emscripten PROXY_TO_PTHREAD, the Qt event loop does not run on the main
+        // runtime thread, so can't access the window object:
+        if (!emscripten::val::global("window").isUndefined() &&
+            !emscripten::val::global("window")["safari"].isUndefined())
+        {
             val canvas = screen()->canvas();
             canvas.call<void>("addEventListener",
                               val("wheel"),
