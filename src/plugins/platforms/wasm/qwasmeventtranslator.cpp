@@ -45,6 +45,7 @@
 #include <QtCore/qnamespace.h>
 
 #include <emscripten/bind.h>
+#include <emscripten/threading.h>
 
 #include <iostream>
 
@@ -358,6 +359,12 @@ QWasmEventTranslator::~QWasmEventTranslator()
     emscripten_set_touchcancel_callback(canvasSelector.constData(),  0, 0, NULL);
 }
 
+extern "C" {
+static bool isSafari() {
+    return !emscripten::val::global("window")["safari"].isUndefined();
+}
+}
+
 void QWasmEventTranslator::initEventHandlers()
 {
     QByteArray canvasSelector = "#" + screen()->canvasId().toUtf8();
@@ -374,11 +381,9 @@ void QWasmEventTranslator::initEventHandlers()
     if (platform == MacOSPlatform) {
         g_useNaturalScrolling = false; // make this !default on macOS
 
-        //TODO: Under Emscripten PROXY_TO_PTHREAD, the Qt event loop does not run on the main
-        // runtime thread, so can't access the window object:
-        if (!emscripten::val::global("window").isUndefined() &&
-            !emscripten::val::global("window")["safari"].isUndefined())
-        {
+        // Under Emscripten PROXY_TO_PTHREAD, the Qt event loop does not run on the main runtime
+        // thread, so can't access the window object directly:
+        if (emscripten_sync_run_in_main_runtime_thread(EM_FUNC_SIG_I, isSafari)) {
             val canvas = screen()->canvas();
             canvas.call<void>("addEventListener",
                               val("wheel"),
