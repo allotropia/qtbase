@@ -159,16 +159,14 @@ qreal QWasmScreen::devicePixelRatio() const
     //
     // The effective devicePixelRatio is the product of these two scale factors, upper-bounded
     // by window.devicePixelRatio in order to avoid e.g. allocating a 10x widget backing store.
-    if (!emscripten::val::global("window").isUndefined()) {
-        double dpr = emscripten::val::global("window")["devicePixelRatio"].as<double>();
-        emscripten::val visualViewport = emscripten::val::global("window")["visualViewport"];
-        double scale = visualViewport.isUndefined() ? 1.0 : visualViewport["scale"].as<double>();
-        double effectiveDevicePixelRatio = std::min(dpr * scale, dpr);
-        return qreal(effectiveDevicePixelRatio);
-    } else {
-        // Emscripten PROXY_TO_PTHREAD case:
-        return emscripten_get_device_pixel_ratio(); //TODO
-    }
+
+    //TODO:  But, especially for systems where the screen resolution is scaled to something other
+    // than 100%, some browsers reported a value of 2.0 with the original code here, while other
+    // browsers reported a value of 1.0, and for those reporting 2.0, the resulting canvas was
+    // increased to a way-to-large size (cf. the `cssSize * devicePixelRatio()` in
+    // QWasmScreen::updateQScreenAndCanvasRenderSize), and it appears that we get the best results
+    // across browsers and screen setups if we always return 1.0 here:
+    return 1.0;
 }
 
 QString QWasmScreen::name() const
