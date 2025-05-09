@@ -379,7 +379,7 @@ void QWasmEventTranslator::initEventHandlers()
     g_usePlatformMacSpecifics = (platform == MacOSPlatform);
 
     if (platform == MacOSPlatform) {
-        g_useNaturalScrolling = false; // make this !default on macOS
+        //g_useNaturalScrolling = false; // make this !default on macOS
 
         // Under Emscripten PROXY_TO_PTHREAD, the Qt event loop does not run on the main runtime
         // thread, so can't access the window object directly:
